@@ -42,3 +42,47 @@
     "pitch": 1
   }
 }
+{
+  "auth": {
+    "enabled": true,
+    "username": "admin",
+    "password": "your-password-here",
+    "sessionSecret": "your-random-secret-key"
+  },
+  "server": {
+    "port": 8001,
+    "host": "0.0.0.0"
+  },
+  "onebot": {
+    "url": "ws://127.0.0.1:3001",
+    "accessToken": ""
+  },
+  "ai": {
+    "baseUrl": "https://api.anthropic.com/v1",
+    "apiKey": "your-api-key-here",
+    "model": "claude-sonnet-4-20250514",
+    "maxTokens": 4096,
+    "temperature": 1
+  },
+  "chat": {
+    "triggerPrefix": "",
+    "historyLimit": 50,
+    "allowedUsers": [],
+    "allowedGroups": [],
+    "splitMessage": true,
+    "defaultCharacter": ""
+  },
+  "regex": {
+    "enabled": true,
+    "rules": []
+  },
+  "tts": {
+    "enabled": false,
+    "appId": "your-doubao-app-id",
+    "accessToken": "your-doubao-access-token",
+    "voiceType": "zh_female_wanwanxiaohe_moon_bigtts",
+    "speed": 1,
+    "volume": 1,
+    "pitch": 1
+  }
+}
