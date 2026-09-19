@@ -16,11 +16,17 @@ export class OneBotClient extends EventEmitter {
         this.connected = false;
         this.pendingCalls = new Map();
         this.callId = 0;
+        this.lastEventAt = 0;
+        this.heartbeatTimer = null;
     }
 
     connect() {
         if (this.ws) {
             this.ws.close();
+        }
+        if (this.heartbeatTimer) {
+            clearInterval(this.heartbeatTimer);
+            this.heartbeatTimer = null;
         }
 
         const url = this.config.url;
@@ -46,6 +52,7 @@ export class OneBotClient extends EventEmitter {
 
         this.ws.on('message', (data) => {
             try {
+                this.lastEventAt = Date.now();
                 const msg = JSON.parse(data.toString());
                 this._handleMessage(msg);
             } catch (e) {
@@ -55,6 +62,10 @@ export class OneBotClient extends EventEmitter {
 
         this.ws.on('close', () => {
             this.connected = false;
+            if (this.heartbeatTimer) {
+                clearInterval(this.heartbeatTimer);
+                this.heartbeatTimer = null;
+            }
             this.emit('disconnected');
             // 自动重连
             setTimeout(() => this.connect(), this.config.reconnectInterval || 5000);
@@ -63,6 +74,17 @@ export class OneBotClient extends EventEmitter {
         this.ws.on('error', (err) => {
             this.logger.error(`WebSocket 错误: ${err.message}`);
         });
+
+        // 心跳检测：OneBot 会定期推送心跳/事件，若长时间无任何数据则判定为僵尸连接，强制重连
+        this.lastEventAt = Date.now();
+        const heartbeatTimeout = this.config.heartbeatTimeout || 90000;
+        this.heartbeatTimer = setInterval(() => {
+            if (!this.connected || !this.ws) return;
+            if (Date.now() - this.lastEventAt > heartbeatTimeout) {
+                this.logger.warn(`超过 ${heartbeatTimeout / 1000} 秒未收到 OneBot 数据，疑似僵尸连接，主动重连...`);
+                this.ws.terminate(); // 触发 close 事件 → 自动重连
+            }
+        }, 15000);
     }
 
     _handleMessage(msg) {

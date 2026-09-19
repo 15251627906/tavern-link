@@ -16,6 +16,7 @@ import { CharacterManager } from './character.js';
 import { WorldBookManager } from './worldbook.js';
 import { PromptBuilder } from './prompt.js';
 import { AIClient } from './ai.js';
+import { VisionClient } from './vision.js';
 import { SessionManager } from './session.js';
 import { RegexProcessor } from './regex.js';
 import { setupRoutes } from './routes.js';
@@ -53,6 +54,7 @@ const worldBookManager = new WorldBookManager(DATA_DIR);
 const sessionManager = new SessionManager(config.chat.maxHistoryLength);
 const regexProcessor = new RegexProcessor(config.regex);
 const aiClient = new AIClient(config.ai);
+const visionClient = new VisionClient(config.imageCaption);
 const promptBuilder = new PromptBuilder(characterManager, worldBookManager);
 const ttsManager = new TTSManager();
 
@@ -95,6 +97,7 @@ setupRoutes(app, {
     sessionManager,
     regexProcessor,
     aiClient,
+    visionClient,
     promptBuilder,
     logger,
     bot,
@@ -118,15 +121,18 @@ wss.on('connection', (ws) => {
 async function handleMessage(event, bot) {
     const { message_type, user_id, group_id, raw_message, message } = event;
     
-    // 提取纯文本
+    // 提取纯文本和图片
     let text = '';
     let isAtMe = false;
-    
+    const imageSources = [];
+
     for (const seg of message) {
         if (seg.type === 'text') {
             text += seg.data.text;
         } else if (seg.type === 'at' && seg.data.qq === String(bot.selfId)) {
             isAtMe = true;
+        } else if (seg.type === 'image') {
+            imageSources.push(seg.data.url || seg.data.file || '');
         }
     }
     text = text.trim();
@@ -170,7 +176,38 @@ async function handleMessage(event, bot) {
         }
     }
     
-    if (!shouldRespond || !text) return;
+    if (!shouldRespond) return;
+
+    // 图片识别：将消息中的图片转换为文字描述，附加到用户消息
+    let imageCaptions = [];
+    if (imageSources.length > 0 && visionClient.isEnabled()) {
+        // 群聊里发图片必须 @机器人；私聊直接识别（最多识别 3 张）
+        const toProcess = imageSources.slice(0, 3);
+        logger.info(`收到 ${toProcess.length} 张图片，开始识别...`);
+
+        for (const src of toProcess) {
+            try {
+                const caption = await visionClient.describe(src, (file) =>
+                    bot._call('get_image', { file }).then(info => info?.url || info?.file).catch(() => null)
+                );
+                imageCaptions.push(caption);
+                logger.info(`图片识别成功: ${caption.substring(0, 60)}...`);
+            } catch (err) {
+                logger.warn(`图片识别失败: ${err.message}`);
+            }
+        }
+
+        if (imageCaptions.length > 0) {
+            const captionText = imageCaptions
+                .map((c, i) => imageCaptions.length > 1 ? `[图片${i + 1}] ${c}` : `[图片] ${c}`)
+                .join('\n');
+            text = text ? `${text}\n\n（用户发送了图片，内容如下）\n${captionText}` : `（用户发送了一张图片）\n${captionText}`;
+        }
+    } else if (imageSources.length > 0) {
+        logger.debug(`消息包含图片，但图片识别功能未启用`);
+    }
+
+    if (!text) return;
     
     // 生成会话 ID
     const sessionId = message_type === 'group' 

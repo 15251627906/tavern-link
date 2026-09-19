@@ -143,6 +143,11 @@ export function setupRoutes(app, deps) {
             if (newConfig.ai) {
                 aiClient.updateConfig(config.ai);
             }
+
+            // 如果图片识别配置更新了，同步更新visionClient
+            if (newConfig.imageCaption && deps.visionClient) {
+                deps.visionClient.updateConfig(config.imageCaption);
+            }
             
             // 保存到文件
             saveConfig(config);

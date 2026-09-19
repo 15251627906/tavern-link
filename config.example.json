@@ -20,6 +20,15 @@
     "maxTokens": 4096,
     "temperature": 1
   },
+  "imageCaption": {
+    "enabled": true,
+    "baseUrl": "https://your-vision-api-provider.com/v1",
+    "apiKey": "your-vision-api-key-here",
+    "model": "gemini-2.0-flash",
+    "maxTokens": 1024,
+    "temperature": 0.3,
+    "prompt": "用中文详细描述这张图片的内容、文字、表情和情绪氛围。"
+  },
   "chat": {
     "triggerPrefix": "",
     "historyLimit": 50,
